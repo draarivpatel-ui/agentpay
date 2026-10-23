@@ -1,0 +1,15 @@
+{
+  "name": "agentpay",
+  "version": "1.0.0",
+  "description": "AgentPay: a policy and audit console for AI shopping agents that spend through PayPal (checkout simulated, nothing live)",
+  "type": "module",
+  "main": "js/engine.js",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "author": "Aariv Patel",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

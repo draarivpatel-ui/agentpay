@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentPay, Policy And Audit Console For AI Shopping Agents</title>
+  <meta name="description" content="AgentPay sits between an AI shopping agent and PayPal. Configure spend policies, score simulated agent proposals with a deterministic risk engine, and audit every decision. Checkout is simulated, no live funds move.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b95f7'/%3E%3Cpath d='M9 17l5 5 9-12' stroke='%23081020' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz-dark.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <!--
+    PAYPAL SANDBOX WIRING: when a sandbox client id is available, uncomment the
+    tag below, replace YOUR_SANDBOX_CLIENT_ID, and follow the steps in
+    js/checkout.js and the README section "Sandbox Wiring". Until then the
+    checkout step is a clearly labeled simulation and no PayPal call is made.
+  <script src="https://www.paypal.com/sdk/js?client-id=YOUR_SANDBOX_CLIENT_ID&currency=USD"></script>
+  -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip To Content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#main" aria-label="AgentPay Home">
+        <svg class="brand-mark" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect width="32" height="32" rx="8" fill="#5b95f7"></rect>
+          <path d="M9 17l5 5 9-12" stroke="#081020" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <span>AgentPay</span>
+      </a>
+      <span class="chip accent">Simulated Checkout</span>
+      <nav class="topnav" aria-label="Section Navigation">
+        <a href="#policies">Policies</a>
+        <a href="#agent">Agent</a>
+        <a href="#approvals">Approvals</a>
+        <a href="#ledger">Ledger</a>
+        <a href="#audit">Audit</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <noscript>
+      <p class="noscript-note">AgentPay needs JavaScript to run the policy engine and render the ledger.</p>
+    </noscript>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">A Spending Policy And Audit Console For AI Shopping Agents</h1>
+      <p class="lede">
+        AgentPay sits between your autonomous shopping agent and PayPal. The agent proposes
+        purchases, a deterministic policy engine scores every proposal, and each decision lands
+        in an approval queue and a tamper evident audit trail. Checkout is simulated end to end,
+        so no live funds ever move.
+      </p>
+      <div class="hero-meta">
+        <span class="chip accent">All Data Is Synthetic</span>
+        <span class="chip faint">No Live PayPal Integration</span>
+        <span class="chip ok">Tests Run On Node</span>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="Session Stats">
+      <dl class="stat card">
+        <dt>Pending Review</dt>
+        <dd id="stat-pending">0</dd>
+      </dl>
+      <dl class="stat card">
+        <dt>Approved This Session</dt>
+        <dd id="stat-approved">0</dd>
+      </dl>
+      <dl class="stat card">
+        <dt>Blocked This Session</dt>
+        <dd id="stat-blocked">0</dd>
+      </dl>
+      <dl class="stat card">
+        <dt>Approved Volume</dt>
+        <dd id="stat-volume">$0.00</dd>
+      </dl>
+    </section>
+
+    <section class="block" id="policies" aria-labelledby="policies-title">
+      <div class="block-head">
+        <h2 id="policies-title">Policy Studio</h2>
+        <p>
+          Set per merchant limits, category rules, amount ceilings, velocity caps, time windows
+          in UTC hours, and minimum trust tiers. Changes apply to the next agent run, and every
+          change is appended to the audit trail.
+        </p>
+      </div>
+      <div class="policy-grid" id="policy-grid"></div>
+    </section>
+
+    <section class="block" id="agent" aria-labelledby="agent-title">
+      <div class="block-head">
+        <h2 id="agent-title">Simulated Shopping Agent</h2>
+        <p>
+          Atlas is a scripted shopping agent, not a live model. Each run proposes purchases drawn
+          from a synthetic catalog with a fixed seed, and every proposal is scored before it can
+          reach the approval queue.
+        </p>
+      </div>
+      <div class="agent-bar card">
+        <div class="field">
+          <label for="agent-count">Proposals Per Run</label>
+          <select id="agent-count">
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="8">8</option>
+          </select>
+        </div>
+        <button type="button" class="btn primary" id="run-agent">Run Agent</button>
+      </div>
+      <div class="stack" id="agent-output" aria-live="polite"></div>
+    </section>
+
+    <section class="block" id="approvals" aria-labelledby="approvals-title">
+      <div class="block-head">
+        <h2 id="approvals-title">Approval Queue</h2>
+        <p>
+          Proposals wait here until a human decides. Approving runs the simulated checkout stub
+          and writes an Approved row to the ledger. Rejecting writes a Blocked row. Both append
+          audit entries with before and after states.
+        </p>
+      </div>
+      <p class="receipt-line" id="receipt-line" aria-live="polite"></p>
+      <div class="stack" id="queue-list"></div>
+    </section>
+
+    <section class="block" id="ledger" aria-labelledby="ledger-title">
+      <div class="block-head">
+        <h2 id="ledger-title">Transaction Ledger</h2>
+        <p>
+          Every synthetic and session transaction in one table. Sort columns, filter by text and
+          number, and drag column headers into the group panel to group rows. The table loads
+          AG Grid Community from a CDN, and falls back to a built in table with the same core
+          abilities when the CDN is unreachable.
+        </p>
+      </div>
+      <p class="grid-status" id="grid-status" aria-live="polite">Loading the ledger table.</p>
+      <div class="grid-wrap ag-theme-quartz-dark" id="grid-wrap"></div>
+    </section>
+
+    <section class="block" id="audit" aria-labelledby="audit-title">
+      <div class="block-head">
+        <h2 id="audit-title">Audit Trail</h2>
+        <p>
+          Append only and hash chained. Each entry stores who acted, what changed, and the before
+          and after states. The chain is reverified on every render. The hash is FNV 1a, chosen
+          for determinism in a demo, not for cryptographic strength.
+        </p>
+      </div>
+      <p class="chain-line"><span id="audit-chain" class="chip faint">Chain Verified</span></p>
+      <ol class="audit-list" id="audit-list"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <p>
+        All data on this page is synthetic and generated for demonstration. AgentPay does not move
+        real money and has no live PayPal integration. The checkout step is a labeled simulation.
+      </p>
+      <p class="footer-links">
+        <a href="LICENSE">MIT License</a>
+        <a href="NOTES.md">Project Notes</a>
+      </p>
+      <p>Built By Aariv Patel</p>
+    </div>
+  </footer>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.noStyle.js" onerror="window.__agGridLoadFailed = true"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
