@@ -2,8 +2,12 @@
 // Owns in memory state, renders every section, and bridges the policy engine,
 // the simulated agent, the simulated checkout and the AG Grid ledger with its
 // fallback table. Nothing here persists: a reload resets the demo.
+// The presentation layer is a financial command deck: the hero pipeline and
+// the score waterfall are computed on load by the same engine the console runs.
 
-import { normalizePolicy, evaluatePolicies, riskScore } from './engine.js';
+document.documentElement.classList.add('js');
+
+import { normalizePolicy, evaluatePolicies, riskScore, merchantMatches, categoryMatches } from './engine.js';
 import { append, verifyChain } from './ledger.js';
 import { runAgent, CATALOG } from './agent.js';
 import { createCheckout, isWired } from './checkout.js';
@@ -31,6 +35,22 @@ const GRID_WIDTHS = {
 };
 const GRID_GROUPABLE = ['merchant', 'category', 'status', 'tier', 'agent', 'channel'];
 
+// The hero sample: a real proposal from the synthetic catalog, scored on page
+// load by the real engine. $1,800 against a $1,500 travel ceiling with a
+// standard tier under a verified gate, so the demo shows the gate catching
+// something and holding it for review.
+const HERO_PROPOSAL = {
+  id: 'prop-hero-sample',
+  agent: 'Atlas',
+  merchant: 'Loopline Travel',
+  category: 'Travel',
+  item: 'Rail Pass',
+  amount: 1800,
+  currency: 'USD',
+  tier: 'standard',
+  ts: Date.UTC(2026, 9, 24, 14, 0, 0)
+};
+
 const state = {
   policies: defaultPolicies(),
   rows: [],
@@ -44,6 +64,11 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+function prefersReducedMotion() {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 function tierWord(value) {
   const s = String(value || '');
@@ -74,27 +99,221 @@ function addAudit(action, entity, before, after, actor, ts) {
   renderAudit();
 }
 
+// ---------- Number tickers ----------
+
+const tickerState = new Map();
+
+function tickTo(el, target, format) {
+  if (!el) return;
+  const prev = tickerState.has(el) ? tickerState.get(el) : 0;
+  tickerState.set(el, target);
+  if (prev === target || prefersReducedMotion()) {
+    el.textContent = format(target);
+    return;
+  }
+  const start = performance.now();
+  const duration = 560;
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = format(prev + (target - prev) * eased);
+    if (t < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- Entrance reveals and section tracking ----------
+
+function initReveals() {
+  const items = Array.from(document.querySelectorAll('[data-reveal]'));
+  if (!items.length) return;
+  if (!('IntersectionObserver' in window) || prefersReducedMotion()) {
+    for (const item of items) item.classList.add('is-in');
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-in');
+        io.unobserve(entry.target);
+      }
+    }
+  }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
+  for (const item of items) io.observe(item);
+}
+
+function initScrollspy() {
+  const links = Array.from(document.querySelectorAll('.topnav a[href^="#"]'));
+  const map = new Map();
+  for (const link of links) {
+    const section = document.getElementById(link.getAttribute('href').slice(1));
+    if (section) map.set(section, link);
+  }
+  if (!map.size || !('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const link = map.get(entry.target);
+      if (!link) continue;
+      for (const other of links) other.removeAttribute('aria-current');
+      link.setAttribute('aria-current', 'true');
+    }
+  }, { rootMargin: '-35% 0px -55% 0px' });
+  for (const section of map.keys()) io.observe(section);
+}
+
+// ---------- Hero pipeline and score waterfall ----------
+
+function buildHeroVerdict() {
+  const policies = defaultPolicies();
+  const evaluation = evaluatePolicies(policies, HERO_PROPOSAL, []);
+  const scored = riskScore(HERO_PROPOSAL, evaluation);
+  return { policies, evaluation, scored };
+}
+
+function checkHtml(kind, name, detail) {
+  return (
+    '<div class="check ' + kind + '">' +
+    '<span class="check-mark" aria-hidden="true"></span>' +
+    '<span class="check-name">' + esc(name) + '</span>' +
+    '<span class="check-detail">' + esc(detail) + '</span>' +
+    '</div>'
+  );
+}
+
+function signed(value) {
+  return value > 0 ? '+' + value : String(value);
+}
+
+function costed(value) {
+  return value > 0 ? '-' + value : String(value);
+}
+
+function renderHeroPipeline(verdict) {
+  const el = $('hero-pipeline');
+  if (!el) return;
+  const p = HERO_PROPOSAL;
+  const evaluation = verdict.evaluation;
+  const scored = verdict.scored;
+  const hits = evaluation.hits;
+  const matched = verdict.policies.find((policy) => merchantMatches(policy, p) && categoryMatches(policy, p));
+  const byRule = (rule) => hits.find((h) => h.rule === rule);
+
+  const checks = [];
+  if (matched) {
+    const ceiling = byRule('ceiling');
+    checks.push(ceiling
+      ? checkHtml('hit', 'Ceiling', ceiling.detail)
+      : checkHtml('clear', 'Ceiling', 'Under The ' + fmtMoney(matched.maxAmount) + ' Ceiling'));
+
+    const velocity = byRule('velocity.count') || byRule('velocity.spend');
+    const velocityText = evaluation.velocity
+      ? evaluation.velocity.count + ' Of ' + matched.maxTxPerWindow + ' Prior In The ' + matched.windowMinutes + ' Min Window'
+      : 'No Window Recorded';
+    checks.push(velocity
+      ? checkHtml('hit', 'Velocity', velocity.detail)
+      : checkHtml('clear', 'Velocity', velocityText));
+
+    const hours = byRule('hours');
+    checks.push(hours
+      ? checkHtml('hit', 'Hours', hours.detail)
+      : checkHtml('clear', 'Hours', 'Inside ' + matched.allowedHours[0] + ' To ' + matched.allowedHours[1] + ' UTC'));
+
+    const tier = byRule('tier');
+    checks.push(tier
+      ? checkHtml('hit', 'Tier', tier.detail)
+      : checkHtml('clear', 'Tier', 'Meets The ' + tierWord(matched.trustTierMin) + ' Minimum'));
+  } else {
+    for (const h of hits) checks.push(checkHtml('hit', h.rule, h.detail));
+  }
+
+  const verdictLine = scored.decision === 'blocked'
+    ? 'Blocked By Policy'
+    : scored.decision === 'review'
+      ? 'Held For Human Review'
+      : 'Cleared To Spend';
+  const s = scored.signals;
+
+  el.innerHTML =
+    '<div class="pipe-node">' +
+    '<p class="node-label">Proposal</p>' +
+    '<p class="p-merchant">' + esc(p.merchant) + '</p>' +
+    '<p class="p-item">' + esc(p.item) + '</p>' +
+    '<p class="p-meta">' + esc(p.category) + ' / ' + esc(tierWord(p.tier)) + ' Tier / ' + esc(p.agent) + '</p>' +
+    '<p class="p-amount">' + esc(fmtMoney(p.amount)) + '</p>' +
+    '</div>' +
+    '<div class="pipe-link" aria-hidden="true"></div>' +
+    '<div class="pipe-node gate">' +
+    '<p class="node-label">Policy Gate</p>' +
+    '<p class="gate-policy">' + esc(matched ? matched.name : 'No Policy Matched') + '</p>' +
+    checks.join('') +
+    '</div>' +
+    '<div class="pipe-link" aria-hidden="true"></div>' +
+    '<div class="pipe-node verdict bracket">' +
+    '<p class="node-label">Verdict</p>' +
+    '<p class="v-score">' + scored.score + '</p>' +
+    '<p class="v-label">Composite Score</p>' +
+    chipHtml(decisionWord(scored.decision), decisionTone(scored.decision)) +
+    '<p class="v-line">' + esc(verdictLine) + '</p>' +
+    '<p class="v-signals">Base ' + s.base + ' / Tier ' + signed(s.tierAdjust) +
+    ' / Amount ' + costed(s.amountPenalty) + ' / Velocity ' + costed(s.velocityPenalty) +
+    ' / Hits ' + costed(s.hitPenalty) + '</p>' +
+    '</div>';
+}
+
+function renderWaterfall(verdict) {
+  const el = $('engine-waterfall');
+  if (!el) return;
+  const s = verdict.scored.signals;
+  const scale = Math.max(s.base, 1);
+  const rows = [
+    { label: 'Base Score', value: s.base, tone: 'base' },
+    { label: 'Tier Adjust', value: s.tierAdjust, tone: s.tierAdjust >= 0 ? 'ok' : 'bad' },
+    { label: 'Amount Penalty', value: -s.amountPenalty, tone: 'bad' },
+    { label: 'Velocity Penalty', value: -s.velocityPenalty, tone: 'bad' },
+    { label: 'Rule Hit Penalty', value: -s.hitPenalty, tone: 'bad' }
+  ];
+  let html = '';
+  for (const row of rows) {
+    const width = Math.round(Math.abs(row.value) / scale * 100);
+    html +=
+      '<div class="w-row">' +
+      '<span class="w-label">' + esc(row.label) + '</span>' +
+      '<span class="w-bar" aria-hidden="true"><span class="w-fill ' + row.tone + '" style="width:' + width + '%"></span></span>' +
+      '<span class="w-value">' + esc(signed(row.value)) + '</span>' +
+      '</div>';
+  }
+  const totalWidth = Math.round(verdict.scored.score / scale * 100);
+  html +=
+    '<div class="w-row w-total">' +
+    '<span class="w-label">Composite Score</span>' +
+    '<span class="w-bar" aria-hidden="true"><span class="w-fill accent" style="width:' + totalWidth + '%"></span></span>' +
+    '<span class="w-value">' + verdict.scored.score + '</span>' +
+    '</div>';
+  el.innerHTML = html;
+}
+
 // ---------- Policies ----------
 
-function policyCardHtml(p) {
+function policyRowHtml(p) {
   const actionTone = p.action === 'block' ? 'bad' : p.action === 'review' ? 'warn' : 'ok';
   return (
-    '<article class="card policy-card" data-id="' + esc(p.id) + '">' +
-    '<div class="policy-top">' +
+    '<article class="policy-row' + (p.enabled ? '' : ' is-off') + '" data-id="' + esc(p.id) + '">' +
+    '<div class="p-id">' +
     '<h3>' + esc(p.name) + '</h3>' +
-    chipHtml(tierWord(p.action), actionTone) +
+    '<p class="p-scope">Merchant ' + (p.merchant === '*' ? 'Any' : esc(p.merchant)) +
+    ' / Category ' + (p.category === '*' ? 'Any' : esc(p.category)) + '</p>' +
     '</div>' +
-    '<p class="policy-scope">Merchant: ' + (p.merchant === '*' ? 'Any' : esc(p.merchant)) +
-    ', Category: ' + (p.category === '*' ? 'Any' : esc(p.category)) + '</p>' +
-    '<dl class="policy-stats">' +
+    '<dl class="p-data">' +
     '<div><dt>Ceiling</dt><dd>' + esc(fmtMoney(p.maxAmount)) + '</dd></div>' +
     '<div><dt>Window</dt><dd>' + p.windowMinutes + ' Min</dd></div>' +
-    '<div><dt>Max Tx</dt><dd>' + p.maxTxPerWindow + '</dd></div>' +
-    '<div><dt>Max Spend</dt><dd>' + (p.maxSpendPerWindow == null ? 'None' : esc(fmtMoney(p.maxSpendPerWindow))) + '</dd></div>' +
-    '<div><dt>Tier Min</dt><dd>' + tierWord(p.trustTierMin) + '</dd></div>' +
+    '<div><dt>Tx Cap</dt><dd>' + p.maxTxPerWindow + '</dd></div>' +
+    '<div><dt>Spend Cap</dt><dd>' + (p.maxSpendPerWindow == null ? 'None' : esc(fmtMoney(p.maxSpendPerWindow))) + '</dd></div>' +
+    '<div><dt>Tier Min</dt><dd>' + esc(tierWord(p.trustTierMin)) + '</dd></div>' +
     '<div><dt>Hours</dt><dd>' + p.allowedHours[0] + ' To ' + p.allowedHours[1] + ' UTC</dd></div>' +
     '</dl>' +
-    '<div class="policy-foot">' +
+    '<div class="p-act">' + chipHtml(tierWord(p.action), actionTone) + '</div>' +
+    '<div class="p-ctl">' +
     '<label class="switch">' +
     '<input type="checkbox" data-role="toggle"' + (p.enabled ? ' checked' : '') + ' aria-label="Enable ' + esc(p.name) + '">' +
     '<span>' + (p.enabled ? 'Enabled' : 'Disabled') + '</span>' +
@@ -106,13 +325,13 @@ function policyCardHtml(p) {
 }
 
 function renderPolicies() {
-  $('policy-grid').innerHTML = state.policies.map(policyCardHtml).join('') + addPolicyFormHtml();
+  $('policy-grid').innerHTML = state.policies.map(policyRowHtml).join('') + addPolicyFormHtml();
 }
 
 function addPolicyFormHtml() {
   const categories = Array.from(new Set(CATALOG.map((c) => c.category)));
   return (
-    '<form class="card add-policy" id="add-policy" novalidate>' +
+    '<form class="add-policy" id="add-policy" novalidate>' +
     '<h3>Add A Policy</h3>' +
     '<div class="field span2"><label for="pf-name">Policy Name</label>' +
     '<input id="pf-name" name="name" type="text" required placeholder="Vendor Cap"></div>' +
@@ -141,7 +360,7 @@ function addPolicyFormHtml() {
     '<option value="review" selected>Review</option>' +
     '<option value="block">Block</option>' +
     '</select></div>' +
-    '<div class="span2 form-foot">' +
+    '<div class="form-foot">' +
     '<button type="submit" class="btn primary">Add Policy</button>' +
     '<p class="form-error" id="policy-error" aria-live="assertive"></p>' +
     '</div>' +
@@ -154,18 +373,19 @@ function bindPolicyEvents() {
   grid.addEventListener('change', (ev) => {
     const input = ev.target.closest('input[data-role="toggle"]');
     if (!input) return;
-    const card = input.closest('.policy-card');
+    const card = input.closest('.policy-row');
     const id = card.getAttribute('data-id');
     const raw = state.policies.find((p) => p.id === id);
     if (!raw) return;
     raw.enabled = input.checked;
     input.parentElement.querySelector('span').textContent = raw.enabled ? 'Enabled' : 'Disabled';
+    card.classList.toggle('is-off', !raw.enabled);
     addAudit('policy.updated', 'policy:' + id, { enabled: !raw.enabled }, { enabled: raw.enabled });
   });
   grid.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-role="remove"]');
     if (!btn) return;
-    const card = btn.closest('.policy-card');
+    const card = btn.closest('.policy-row');
     const id = card.getAttribute('data-id');
     const raw = state.policies.find((p) => p.id === id);
     state.policies = state.policies.filter((p) => p.id !== id);
@@ -225,6 +445,7 @@ function hitsListHtml(hits) {
 
 function queueCardHtml(item, withActions) {
   const p = item.proposal;
+  const tone = decisionTone(item.scored.decision);
   const actions = withActions
     ? (
       '<div class="queue-actions">' +
@@ -233,17 +454,17 @@ function queueCardHtml(item, withActions) {
       '<span class="queue-note">Checkout is simulated, no live funds move.</span>' +
       '</div>'
     )
-    : '<p class="queue-note">Queued Below For Your Decision.</p>';
+    : '<p class="queue-note">Queued below for your decision.</p>';
   return (
-    '<article class="card queue-card">' +
-    '<div class="queue-top">' +
+    '<article class="queue-card ' + tone + '">' +
+    '<div class="q-head">' +
     '<div>' +
     '<h3>' + esc(p.merchant) + '</h3>' +
-    '<p class="queue-meta">' + esc(p.item) + ', ' + esc(p.category) + ', ' + tierWord(p.tier) + ' Tier, ' + esc(fmtTs(p.ts)) + '</p>' +
+    '<p class="q-meta">' + esc(p.item) + ' / ' + esc(p.category) + ' / ' + esc(tierWord(p.tier)) + ' Tier / ' + esc(fmtTs(p.ts)) + '</p>' +
     '</div>' +
-    '<div class="queue-side">' +
-    chipHtml(decisionWord(item.scored.decision), decisionTone(item.scored.decision)) +
-    '<span class="queue-amount">' + esc(fmtMoney(p.amount)) + '</span>' +
+    '<div class="q-side">' +
+    chipHtml(decisionWord(item.scored.decision), tone) +
+    '<span class="q-amount">' + esc(fmtMoney(p.amount)) + '</span>' +
     '</div>' +
     '</div>' +
     scoreBarHtml(item.scored.score) +
@@ -253,21 +474,43 @@ function queueCardHtml(item, withActions) {
   );
 }
 
+function ticketHtml(item) {
+  const p = item.proposal;
+  const tone = decisionTone(item.scored.decision);
+  return (
+    '<article class="ticket ' + tone + '">' +
+    '<div class="t-id">' +
+    '<span class="t-merchant">' + esc(p.merchant) + '</span>' +
+    '<span class="t-item">' + esc(p.item) + '</span>' +
+    '</div>' +
+    '<span class="t-cat">' + esc(p.category) + ' / ' + esc(tierWord(p.tier)) + ' Tier</span>' +
+    scoreBarHtml(item.scored.score) +
+    chipHtml(decisionWord(item.scored.decision), tone) +
+    '<span class="t-amount">' + esc(fmtMoney(p.amount)) + '</span>' +
+    '</article>'
+  );
+}
+
 function renderAgentOutput(items) {
   const el = $('agent-output');
+  const wasEmpty = !el.querySelector('.ticket');
   if (!items || items.length === 0) {
     el.innerHTML = '<p class="empty">No Runs Yet. Run The Agent To Propose Purchases.</p>';
+    el.classList.remove('just-filled');
     return;
   }
-  el.innerHTML = items.map((item) => queueCardHtml(item, false)).join('');
+  el.innerHTML = items.map(ticketHtml).join('');
+  el.classList.toggle('just-filled', wasEmpty);
 }
 
 function renderQueue() {
   const el = $('queue-list');
   const pending = state.queue.filter((q) => q.status === 'pending').reverse();
+  const wasEmpty = !el.querySelector('.queue-card');
   el.innerHTML = pending.length
     ? pending.map((item) => queueCardHtml(item, true)).join('')
     : '<p class="empty">The Queue Is Empty. Run The Agent To Propose Purchases.</p>';
+  el.classList.toggle('just-filled', wasEmpty && pending.length > 0);
 }
 
 function runAgentBatch() {
@@ -381,6 +624,15 @@ function initLedger() {
             enableRowGroup: GRID_GROUPABLE.includes(col.key)
           };
           if (col.key === 'merchant' || col.key === 'channel') def.flex = 1;
+          const cellClasses = [];
+          if (col.kind === 'ts' || col.kind === 'money' || col.kind === 'score' || col.kind === 'hits' || col.key === 'id') {
+            cellClasses.push('cell-mono');
+          }
+          if (col.numeric && col.key !== 'ts') {
+            cellClasses.push('cell-num');
+            def.headerClass = 'ag-right-aligned-header';
+          }
+          if (cellClasses.length) def.cellClass = cellClasses.join(' ');
           if (col.kind === 'status') def.cellRenderer = (p) => chipHtml(p.value, statusTone(p.value));
           else if (col.kind === 'score') def.cellRenderer = (p) => scoreBarHtml(p.value);
           else if (col.kind === 'money') def.cellRenderer = (p) => esc(fmtMoney(p.value));
@@ -429,15 +681,11 @@ function refreshLedger() {
 
 // ---------- Stats And Audit ----------
 
-function setText(id, value) {
-  $(id).textContent = value;
-}
-
 function renderStats() {
-  setText('stat-pending', String(state.queue.filter((q) => q.status === 'pending').length));
-  setText('stat-approved', String(state.session.approved));
-  setText('stat-blocked', String(state.session.blocked));
-  setText('stat-volume', fmtMoney(state.session.volume));
+  tickTo($('stat-pending'), state.queue.filter((q) => q.status === 'pending').length, (v) => String(Math.round(v)));
+  tickTo($('stat-approved'), state.session.approved, (v) => String(Math.round(v)));
+  tickTo($('stat-blocked'), state.session.blocked, (v) => String(Math.round(v)));
+  tickTo($('stat-volume'), state.session.volume, (v) => fmtMoney(v));
 }
 
 const AUDIT_TONES = { decision: 'accent', checkout: 'ok', policy: 'warn', proposal: 'faint' };
@@ -458,14 +706,15 @@ function renderAudit() {
   const items = state.audit.slice(-30).reverse();
   list.innerHTML = items.map((e) => (
     '<li class="audit-item">' +
-    '<div class="audit-head">' +
-    '<span class="seq">#' + e.seq + '</span>' +
+    '<div class="a-row">' +
+    '<span class="a-seq">#' + String(e.seq).padStart(4, '0') + '</span>' +
     chipHtml(actionLabel(e.action), auditTone(e.action)) +
-    '<span class="audit-entity">' + esc(e.entity) + '</span>' +
-    '<span class="audit-actor">' + esc(e.actor) + '</span>' +
-    '<span class="audit-time">' + esc(fmtTs(e.ts)) + '</span>' +
+    '<span class="a-entity">' + esc(e.entity) + '</span>' +
+    '<span class="a-actor">' + esc(e.actor) + '</span>' +
+    '<span class="a-time">' + esc(fmtTs(e.ts)) + '</span>' +
     '</div>' +
-    '<details class="audit-body">' +
+    '<p class="a-hash">Hash ' + esc(e.hash) + ' / Prev ' + esc(e.prevHash) + '</p>' +
+    '<details class="a-body">' +
     '<summary>Before And After States</summary>' +
     '<pre class="json">before: ' + esc(JSON.stringify(e.before, null, 2)) + '\n' +
     ' after: ' + esc(JSON.stringify(e.after, null, 2)) + '</pre>' +
@@ -495,6 +744,9 @@ function init() {
   const now = Date.now();
   state.rows = seedTransactions(now);
   state.audit = seedAudit(now);
+  const verdict = buildHeroVerdict();
+  renderHeroPipeline(verdict);
+  renderWaterfall(verdict);
   renderPolicies();
   bindPolicyEvents();
   renderAgentOutput(null);
@@ -503,6 +755,8 @@ function init() {
   renderAudit();
   initLedger();
   bindGlobalEvents();
+  initReveals();
+  initScrollspy();
 }
 
 init();

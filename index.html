@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AgentPay, Policy And Audit Console For AI Shopping Agents</title>
   <meta name="description" content="AgentPay sits between an AI shopping agent and PayPal. Configure spend policies, score simulated agent proposals with a deterministic risk engine, and audit every decision. Checkout is simulated, no live funds move.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b95f7'/%3E%3Cpath d='M9 17l5 5 9-12' stroke='%23081020' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#0b0f16">
+  <meta property="og:title" content="AgentPay, Policy And Audit Console For AI Shopping Agents">
+  <meta property="og:description" content="Agents propose, the policy gate decides, the ledger proves. Deterministic scoring, human approvals, hash chained audit trail. Checkout is simulated.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e8a33d'/%3E%3Cpath d='M9 17l5 5 9-12' stroke='%230b0f16' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz-dark.min.css">
   <link rel="stylesheet" href="styles.css">
@@ -21,19 +28,18 @@
   <a class="skip-link" href="#main">Skip To Content</a>
 
   <header class="topbar">
-    <div class="topbar-inner">
+    <div class="shell topbar-inner">
       <a class="brand" href="#main" aria-label="AgentPay Home">
-        <svg class="brand-mark" width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <rect width="32" height="32" rx="8" fill="#5b95f7"></rect>
-          <path d="M9 17l5 5 9-12" stroke="#081020" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+        <svg class="brand-mark" width="24" height="24" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect width="32" height="32" rx="7" fill="#e8a33d"></rect>
+          <path d="M9 17l5 5 9-12" stroke="#0b0f16" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
         </svg>
         <span>AgentPay</span>
       </a>
-      <span class="chip accent">Simulated Checkout</span>
+      <span class="chip accent topbar-chip">Simulated Checkout</span>
       <nav class="topnav" aria-label="Section Navigation">
-        <a href="#policies">Policies</a>
-        <a href="#agent">Agent</a>
-        <a href="#approvals">Approvals</a>
+        <a href="#console">Console</a>
+        <a href="#engine">Engine</a>
         <a href="#ledger">Ledger</a>
         <a href="#audit">Audit</a>
       </nav>
@@ -42,122 +48,173 @@
 
   <main id="main">
     <noscript>
-      <p class="noscript-note">AgentPay needs JavaScript to run the policy engine and render the ledger.</p>
+      <p class="noscript-note shell">AgentPay needs JavaScript to run the policy engine and render the ledger.</p>
     </noscript>
 
-    <section class="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title">A Spending Policy And Audit Console For AI Shopping Agents</h1>
-      <p class="lede">
-        AgentPay sits between your autonomous shopping agent and PayPal. The agent proposes
-        purchases, a deterministic policy engine scores every proposal, and each decision lands
-        in an approval queue and a tamper evident audit trail. Checkout is simulated end to end,
-        so no live funds ever move.
-      </p>
-      <div class="hero-meta">
-        <span class="chip accent">All Data Is Synthetic</span>
-        <span class="chip faint">No Live PayPal Integration</span>
-        <span class="chip ok">Tests Run On Node</span>
-      </div>
-    </section>
-
-    <section class="stats" aria-label="Session Stats">
-      <dl class="stat card">
-        <dt>Pending Review</dt>
-        <dd id="stat-pending">0</dd>
-      </dl>
-      <dl class="stat card">
-        <dt>Approved This Session</dt>
-        <dd id="stat-approved">0</dd>
-      </dl>
-      <dl class="stat card">
-        <dt>Blocked This Session</dt>
-        <dd id="stat-blocked">0</dd>
-      </dl>
-      <dl class="stat card">
-        <dt>Approved Volume</dt>
-        <dd id="stat-volume">$0.00</dd>
-      </dl>
-    </section>
-
-    <section class="block" id="policies" aria-labelledby="policies-title">
-      <div class="block-head">
-        <h2 id="policies-title">Policy Studio</h2>
-        <p>
-          Set per merchant limits, category rules, amount ceilings, velocity caps, time windows
-          in UTC hours, and minimum trust tiers. Changes apply to the next agent run, and every
-          change is appended to the audit trail.
-        </p>
-      </div>
-      <div class="policy-grid" id="policy-grid"></div>
-    </section>
-
-    <section class="block" id="agent" aria-labelledby="agent-title">
-      <div class="block-head">
-        <h2 id="agent-title">Simulated Shopping Agent</h2>
-        <p>
-          Atlas is a scripted shopping agent, not a live model. Each run proposes purchases drawn
-          from a synthetic catalog with a fixed seed, and every proposal is scored before it can
-          reach the approval queue.
-        </p>
-      </div>
-      <div class="agent-bar card">
-        <div class="field">
-          <label for="agent-count">Proposals Per Run</label>
-          <select id="agent-count">
-            <option value="3">3</option>
-            <option value="5" selected>5</option>
-            <option value="8">8</option>
-          </select>
+    <section class="hero shell" aria-labelledby="hero-title">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1 id="hero-title" data-reveal>
+            <span>Agents Propose.</span>
+            <span class="hero-accent">Policy Decides.</span>
+            <span>The Ledger Proves.</span>
+          </h1>
+          <p class="lede" data-reveal>
+            AgentPay sits between an autonomous shopping agent and PayPal. Proposals from the agent
+            hit a policy gate before any money moves, a deterministic engine scores each one, and
+            every decision lands in an approval queue and a hash chained ledger. Checkout is
+            simulated end to end, so no live funds ever move.
+          </p>
         </div>
-        <button type="button" class="btn primary" id="run-agent">Run Agent</button>
+        <dl class="hero-spec" data-reveal aria-label="Console Facts">
+          <div><dt>Surface</dt><dd>Policy And Audit Console</dd></div>
+          <div><dt>Engine</dt><dd>Deterministic, Offline</dd></div>
+          <div><dt>Data</dt><dd>Synthetic And Seeded</dd></div>
+          <div><dt>Checkout</dt><dd>Simulated, No Live Funds</dd></div>
+          <div><dt>Tests</dt><dd>Run With Node</dd></div>
+        </dl>
       </div>
-      <div class="stack" id="agent-output" aria-live="polite"></div>
+
+      <figure class="pipeline" id="hero-pipeline" data-reveal aria-label="A Sample Agent Proposal Moving Through The Policy Gate To A Verdict">
+        <p class="empty">Scoring the sample proposal.</p>
+      </figure>
+      <p class="pipe-caption" data-reveal>
+        Scored on page load by the same engine the console below runs. Same inputs, same verdict, every time.
+      </p>
     </section>
 
-    <section class="block" id="approvals" aria-labelledby="approvals-title">
-      <div class="block-head">
-        <h2 id="approvals-title">Approval Queue</h2>
-        <p>
-          Proposals wait here until a human decides. Approving runs the simulated checkout stub
-          and writes an Approved row to the ledger. Rejecting writes a Blocked row. Both append
-          audit entries with before and after states.
-        </p>
+    <section class="console" id="console" aria-label="The Live Console">
+      <div class="shell">
+        <dl class="deck-band" data-reveal="stagger" aria-label="Session Stats">
+          <div class="stat"><dt>Pending Review</dt><dd id="stat-pending">0</dd></div>
+          <div class="stat"><dt>Approved This Session</dt><dd id="stat-approved">0</dd></div>
+          <div class="stat"><dt>Blocked This Session</dt><dd id="stat-blocked">0</dd></div>
+          <div class="stat"><dt>Approved Volume</dt><dd id="stat-volume">$0.00</dd></div>
+        </dl>
+
+        <div class="block" id="policies" aria-labelledby="policies-title">
+          <header class="block-head" data-reveal>
+            <h2 id="policies-title">Policy Studio</h2>
+            <p>
+              The gate is yours to configure. Each policy carries a merchant scope, a category scope,
+              an amount ceiling, a velocity window with transaction and spend caps, an allowed UTC
+              hour range, and a minimum trust tier. Toggling or removing a policy appends to the
+              audit trail, and changes apply to the next agent run.
+            </p>
+          </header>
+          <div class="policy-grid" id="policy-grid"></div>
+        </div>
+
+        <div class="block" id="agent" aria-labelledby="agent-title">
+          <header class="block-head" data-reveal>
+            <h2 id="agent-title">Run The Agent</h2>
+            <p>
+              Atlas is a scripted shopping agent, not a live model. Each run proposes purchases from
+              a seeded synthetic catalog of ten merchants, and every proposal is scored by the gate
+              before it can reach the queue.
+            </p>
+          </header>
+          <div class="agent-bar" data-reveal>
+            <div class="field">
+              <label for="agent-count">Proposals Per Run</label>
+              <select id="agent-count">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="8">8</option>
+              </select>
+            </div>
+            <button type="button" class="btn primary" id="run-agent">Run Agent</button>
+            <p class="agent-note">Seeded and deterministic. The same run proposes the same purchases.</p>
+          </div>
+          <div class="stack" id="agent-output" aria-live="polite"></div>
+        </div>
+
+        <div class="block" id="approvals" aria-labelledby="approvals-title">
+          <header class="block-head" data-reveal>
+            <h2 id="approvals-title">The Approval Queue</h2>
+            <p>
+              Nothing spends on its own. Proposals wait here until a human decides. Approving runs
+              the simulated checkout stub and writes an approved row to the ledger. Rejecting writes
+              a blocked row. Both append audit entries with before and after states.
+            </p>
+          </header>
+          <p class="receipt-line" id="receipt-line" aria-live="polite"></p>
+          <div class="stack" id="queue-list"></div>
+        </div>
       </div>
-      <p class="receipt-line" id="receipt-line" aria-live="polite"></p>
-      <div class="stack" id="queue-list"></div>
     </section>
 
-    <section class="block" id="ledger" aria-labelledby="ledger-title">
-      <div class="block-head">
-        <h2 id="ledger-title">Transaction Ledger</h2>
+    <section class="block shell" id="engine" aria-labelledby="engine-title">
+      <header class="block-head" data-reveal>
+        <h2 id="engine-title">How The Engine Reasons</h2>
         <p>
-          Every synthetic and session transaction in one table. Sort columns, filter by text and
-          number, and drag column headers into the group panel to group rows. The table loads
-          AG Grid Community from a CDN, and falls back to a built in table with the same core
-          abilities when the CDN is unreachable.
+          The score starts from a base of 62 and moves with the evidence. Trust tier adjusts it,
+          amount and velocity apply bounded penalties, and each rule hit subtracts weight by the
+          severity of its policy. A policy verdict always wins over the arithmetic.
         </p>
+      </header>
+      <div class="engine-grid">
+        <div class="waterfall-panel bracket" data-reveal>
+          <p class="panel-label">Score Waterfall, Sample Proposal</p>
+          <div class="waterfall" id="engine-waterfall">
+            <p class="empty">Computing the sample score.</p>
+          </div>
+          <p class="panel-note">The hero proposal, decomposed. Deterministic on every machine.</p>
+        </div>
+        <div class="engine-side">
+          <dl class="rule-list" data-reveal="stagger">
+            <div><dt>ceiling</dt><dd>The amount exceeds the policy ceiling.</dd></div>
+            <div><dt>velocity.count</dt><dd>Prior transactions for the merchant in the window reach the cap.</dd></div>
+            <div><dt>velocity.spend</dt><dd>Window spend plus this amount crosses the spend cap.</dd></div>
+            <div><dt>hours</dt><dd>The proposal hour in UTC falls outside the allowed window.</dd></div>
+            <div><dt>tier</dt><dd>The trust tier sits below the policy minimum.</dd></div>
+            <div><dt>no.match</dt><dd>No enabled policy matches, so the proposal is held for review instead of passing silently.</dd></div>
+          </dl>
+          <p class="weights" data-reveal>
+            Hit weight follows the policy action: block 22, review 10, allow 4, unmatched 10.
+            Penalties cap at 40 for hits, 20 for amount, and 24 for velocity.
+          </p>
+          <aside class="deck-note bracket" data-reveal>
+            <h3>Verdicts Beat Numbers</h3>
+            <p>
+              A block hit blocks at any score, a review hit holds the proposal for a human, and a
+              clean evaluation still needs a score of 45 or higher to clear on its own.
+            </p>
+          </aside>
+        </div>
       </div>
-      <p class="grid-status" id="grid-status" aria-live="polite">Loading the ledger table.</p>
-      <div class="grid-wrap ag-theme-quartz-dark" id="grid-wrap"></div>
     </section>
 
-    <section class="block" id="audit" aria-labelledby="audit-title">
-      <div class="block-head">
-        <h2 id="audit-title">Audit Trail</h2>
+    <section class="block shell" id="ledger" aria-labelledby="ledger-title">
+      <header class="block-head" data-reveal>
+        <h2 id="ledger-title">The Transaction Ledger</h2>
         <p>
-          Append only and hash chained. Each entry stores who acted, what changed, and the before
-          and after states. The chain is reverified on every render. The hash is FNV 1a, chosen
-          for determinism in a demo, not for cryptographic strength.
+          Every seed and session transaction in one table. Sort columns, filter by text and number,
+          and drag headers into the group panel to group rows. AG Grid Community loads from a CDN,
+          and when it cannot, a built in table takes over with the same core abilities.
         </p>
-      </div>
-      <p class="chain-line"><span id="audit-chain" class="chip faint">Chain Verified</span></p>
+      </header>
+      <p class="grid-status" id="grid-status" aria-live="polite" data-reveal>Loading the ledger table.</p>
+      <div class="grid-wrap ag-theme-quartz-dark bracket" id="grid-wrap" data-reveal></div>
+    </section>
+
+    <section class="block shell" id="audit" aria-labelledby="audit-title">
+      <header class="block-head" data-reveal>
+        <h2 id="audit-title">Audit Integrity</h2>
+        <p>
+          Append only and hash chained. Each entry records the actor, the action, the entity, and
+          the before and after states. The chain is reverified on every render. The hash is FNV 1a,
+          chosen for determinism in a demo, not for cryptographic strength.
+        </p>
+      </header>
+      <p class="chain-line" data-reveal><span id="audit-chain" class="chip ok">Chain Verified</span></p>
       <ol class="audit-list" id="audit-list"></ol>
     </section>
   </main>
 
   <footer>
-    <div class="footer-inner">
-      <p>
+    <div class="shell footer-inner">
+      <p class="footer-disclosure">
         All data on this page is synthetic and generated for demonstration. AgentPay does not move
         real money and has no live PayPal integration. The checkout step is a labeled simulation.
       </p>
@@ -165,7 +222,7 @@
         <a href="LICENSE">MIT License</a>
         <a href="NOTES.md">Project Notes</a>
       </p>
-      <p>Built By Aariv Patel</p>
+      <p class="footer-author">Built By Aariv Patel</p>
     </div>
   </footer>
 
