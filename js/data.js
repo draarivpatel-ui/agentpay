@@ -5,6 +5,7 @@
 // a real transaction or a real person.
 
 import { append } from './ledger.js';
+import { normalizePolicy } from './engine.js';
 import { CATALOG } from './agent.js';
 
 function mulberry32(seed) {
@@ -23,7 +24,10 @@ function round2(value) {
 }
 
 // Five starter policies that demonstrate every rule the engine supports.
-// Returned as fresh copies so toggling one cannot leak between reloads.
+// Each one runs through normalizePolicy so it carries the same defaults the
+// engine fills in (allowedHours 0 to 24, enabled true), which the console
+// renders directly. Returned as fresh unfrozen copies so toggling one cannot
+// leak between reloads and the switch handler can still write enabled.
 export function defaultPolicies() {
   return [
     {
@@ -86,7 +90,7 @@ export function defaultPolicies() {
       maxSpendPerWindow: null,
       trustTierMin: 'verified'
     }
-  ].map((policy) => ({ ...policy }));
+  ].map((policy) => ({ ...normalizePolicy(policy) }));
 }
 
 const TIERS_CYCLE = ['guest', 'standard', 'verified', 'premium'];

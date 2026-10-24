@@ -113,3 +113,46 @@ agentpay/
     ledger.test.js        Immutable append, hash chain, verification, diffing (19 tests)
     agent.test.js         Seeded generation, shape, and limits (10 tests)
 ```
+
+## Refinement Pass 2026-10-24
+
+A defect and polish sweep over the deployed build. No art direction, feature or dependency
+changed. Tests before the pass, 77 passing. Tests after the pass, 77 passing.
+
+Defects found and fixed.
+
+- The page threw a TypeError on every normal load. `defaultPolicies()` returned raw policy
+  objects without `allowedHours` or `enabled`, and both `renderHeroPipeline` (via
+  `matched.allowedHours[0]`) and `renderPolicies` (via `p.allowedHours[0]` and `p.enabled`)
+  read those fields directly. The hero pipeline, policy studio, queue, ledger and audit all
+  died at init because `init()` aborted at the first render. Fix, `data.js` now routes each
+  starter policy through `normalizePolicy` and spreads it into a fresh unfrozen copy, so the
+  defaults the engine fills in (hours 0 to 24, enabled true) are present for the renderers
+  and the toggle handler can still write `enabled`. The hero sample verdict is unchanged
+  (score 22, review, ceiling and tier hits) because `evaluatePolicies` was already
+  normalizing internally.
+- Token level contrast near misses, computed with the WCAG formula from the oklch tokens.
+  `--faint` on `--ink-2` measured 4.39 to 1 (the audit chip `.chip.faint` renders that pair
+  at 0.72rem), now raised from L 0.60 to L 0.62, which measures 4.76 to 1 on `--ink-2` and
+  improves every other faint surface. `--bad-strong` at 0.45 alpha measured 2.20 to 1 as the
+  danger button border, raised to 0.6 alpha for 3.08 to 1 against `--ink-0`, past the 3 to 1
+  non text boundary bar. All other text pairs on their real backgrounds measure 4.7 to 1 or
+  better.
+- `theme-color` was `#0b0f16`, close to but not the canvas token. Computed `--ink-0` from the
+  CSS Color 4 algorithm is `#060b10`, so the meta now matches the page background exactly.
+
+Checked and found already sound. Every id the JS looks up exists in the HTML (26 references,
+including the dynamically rendered add policy form), no duplicate ids, no dead event
+listeners, no console paths reachable on load now that the init throw is fixed. The fallback
+ledger table keeps native controls with real labels and `aria-sort`. Skip link, focus visible
+rings, aria live regions on the queue, receipt, grid status, policy error and agent output
+are all in place. Reduced motion is fully honored in CSS and the reveal and ticker code paths
+check `prefers-reduced-motion` before animating; the only JS animation runs on
+requestAnimationFrame, which pauses in hidden tabs, and the only CSS animation is decorative
+pipeline flow. Copy carries no em or en dashes, no emoji, no all caps kickers, and no
+text-transform anywhere. No layout overflows at 320 px, the wide fallback table scrolls
+inside its own container and every grid collapses to single column by 640 px.
+
+Noted, not forced. The AG Grid CDN stylesheet and script stay external by design (the built
+in fallback table covers the offline case). The `ag-*` selectors in the stylesheet style the
+grid library's own runtime DOM and are not removable without breaking the themed grid.
