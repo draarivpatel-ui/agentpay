@@ -13,3 +13,5 @@ Built with: vanilla JavaScript, AG Grid Community, node:test, and a deterministi
 
 Try it: https://aariv.me/agentpay/
 Code: https://github.com/draarivpatel-ui/agentpay
+
+Video: https://youtu.be/CrbLAFoQ1Kg
