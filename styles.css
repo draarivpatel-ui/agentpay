@@ -1145,6 +1145,17 @@ section[id], main[id] { scroll-margin-top: 86px; }
   min-height: 20px;
 }
 
+.ledger-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ledger-bar .grid-status { margin-bottom: 0; }
+
 .grid-status::before {
   content: "";
   width: 7px;

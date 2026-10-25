@@ -24,8 +24,9 @@ CDN) with zero build step and zero dependencies to install.
   Approving runs the simulated checkout stub (no network, clearly labeled) and writes an Approved
   ledger row; rejecting writes a Blocked row.
 - **Transaction Ledger.** The centerpiece. AG Grid Community v32 from the jsDelivr CDN with
-  sorting, text and number filters, a row group panel, pagination and keyboard navigation. When
-  the CDN cannot load, a built in vanilla JS table takes over automatically with sorting, text and
+  sorting, text and number filters, pagination and keyboard navigation (row grouping is an
+  Enterprise feature, so the Grouped Table toggle swaps in the built in table). When
+  the CDN cannot load, that built in vanilla JS table takes over automatically with sorting, text and
   status filters, and grouped sections with row counts and amount subtotals.
 - **Audit Trail.** Append only, FNV 1a hash chained, verified on every render, with expandable
   before and after states per entry.
@@ -78,8 +79,8 @@ is 0.05 seconds against the 30 second cap, and no test touches the network.
 
 - A deterministic risk engine you can actually audit: rule hits, velocity checks, trust tiers and
   score clamps, with 77 passing tests proving the same proposal always gets the same decision.
-- The transaction ledger is the centerpiece: AG Grid Community sorting, filtering and a row group
-  panel, plus a built in fallback table that takes over automatically when the CDN is unreachable.
+- The transaction ledger is the centerpiece: AG Grid Community sorting and filtering, plus a built
+  in table with grouped subtotals, one toggle away and automatic when the CDN is unreachable.
 - Every decision lands in an append only, hash chained audit trail with before and after states,
   reverified on every render and expandable entry by entry.
 - An honest simulated checkout: one documented wiring point where a PayPal sandbox client id

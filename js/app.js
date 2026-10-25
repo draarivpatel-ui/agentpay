@@ -33,7 +33,6 @@ const GRID_WIDTHS = {
   id: 118, ts: 150, merchant: 170, category: 118, amount: 112, status: 118,
   score: 156, hitsCount: 104, tier: 116, agent: 92, channel: 160
 };
-const GRID_GROUPABLE = ['merchant', 'category', 'status', 'tier', 'agent', 'channel'];
 
 // The hero sample: a real proposal from the synthetic catalog, scored on page
 // load by the real engine. $1,800 against a $1,500 travel ceiling with a
@@ -605,23 +604,24 @@ function renderReceipt(item) {
 
 // ---------- Ledger ----------
 
-function initLedger() {
-  const wrap = $('grid-wrap');
-  const status = $('grid-status');
+function agGridLib() {
   const agGrid = typeof window !== 'undefined' ? window.agGrid : undefined;
-  try {
-    if (agGrid && (typeof agGrid.createGrid === 'function' || typeof agGrid.Grid === 'function')) {
-      const gridOptions = {
-        rowData: rowsSorted(),
-        columnDefs: LEDGER_COLUMNS.map((col) => {
+  return agGrid && (typeof agGrid.createGrid === 'function' || typeof agGrid.Grid === 'function') ? agGrid : null;
+}
+
+// AG Grid Community has no row grouping (that is an Enterprise feature), so grouping with
+// subtotals lives in the built in table. The view toggle swaps between the two.
+function mountAgGrid(wrap, agGrid) {
+  const gridOptions = {
+    rowData: rowsSorted(),
+    columnDefs: LEDGER_COLUMNS.map((col) => {
           const def = {
             field: col.key,
             headerName: col.label,
             width: GRID_WIDTHS[col.key] || 120,
             sortable: true,
             resizable: true,
-            filter: col.numeric ? 'agNumberColumnFilter' : true,
-            enableRowGroup: GRID_GROUPABLE.includes(col.key)
+            filter: col.numeric ? 'agNumberColumnFilter' : true
           };
           if (col.key === 'merchant' || col.key === 'channel') def.flex = 1;
           const cellClasses = [];
@@ -640,30 +640,67 @@ function initLedger() {
           else if (col.kind === 'hits') def.cellRenderer = (p) => esc(hitsLabel(p.value));
           return def;
         }),
-        defaultColDef: { sortable: true, filter: true, resizable: true, minWidth: 96 },
-        rowGroupPanelShow: 'always',
-        pagination: true,
-        paginationPageSize: 25,
-        animateRows: true,
-        getRowId: (params) => String(params.data.id)
-      };
-      if (typeof agGrid.createGrid === 'function') {
-        state.gridApi = agGrid.createGrid(wrap, gridOptions);
-      } else {
-        new agGrid.Grid(wrap, gridOptions);
-        state.gridApi = gridOptions.api;
+    defaultColDef: { sortable: true, filter: true, resizable: true, minWidth: 96 },
+    pagination: true,
+    paginationPageSize: 25,
+    paginationPageSizeSelector: [25, 50, 100],
+    animateRows: true,
+    getRowId: (params) => String(params.data.id)
+  };
+  if (typeof agGrid.createGrid === 'function') {
+    state.gridApi = agGrid.createGrid(wrap, gridOptions);
+  } else {
+    new agGrid.Grid(wrap, gridOptions);
+    state.gridApi = gridOptions.api;
+  }
+  state.usingAgGrid = true;
+}
+
+function unmountLedger(wrap) {
+  if (state.gridApi && typeof state.gridApi.destroy === 'function') state.gridApi.destroy();
+  state.gridApi = null;
+  state.fallback = null;
+  state.usingAgGrid = false;
+  wrap.innerHTML = '';
+}
+
+function mountTable(wrap) {
+  state.fallback = renderLedgerTable(wrap, LEDGER_COLUMNS, rowsSorted);
+}
+
+function initLedger() {
+  const wrap = $('grid-wrap');
+  const status = $('grid-status');
+  const toggle = $('ledger-view');
+  const agGrid = agGridLib();
+  try {
+    if (agGrid) {
+      mountAgGrid(wrap, agGrid);
+      status.textContent = 'Ledger rendered with AG Grid Community from the jsDelivr CDN. Sort and filter any column, or switch to the grouped table.';
+      if (toggle) {
+        toggle.hidden = false;
+        toggle.addEventListener('click', () => {
+          const grouped = toggle.getAttribute('aria-pressed') !== 'true';
+          unmountLedger(wrap);
+          if (grouped) {
+            mountTable(wrap);
+            status.textContent = 'Built in table. Pick a column under Group By to see row counts and amount subtotals per group.';
+          } else {
+            mountAgGrid(wrap, agGrid);
+            status.textContent = 'Ledger rendered with AG Grid Community from the jsDelivr CDN. Sort and filter any column, or switch to the grouped table.';
+          }
+          toggle.setAttribute('aria-pressed', String(grouped));
+          toggle.textContent = grouped ? 'Back To AG Grid' : 'Grouped Table';
+        });
       }
-      state.usingAgGrid = true;
-      status.textContent = 'Ledger rendered with AG Grid Community from the jsDelivr CDN. Sort, filter and drag columns to the group panel.';
       return;
     }
   } catch (err) {
-    wrap.innerHTML = '';
-    state.usingAgGrid = false;
+    unmountLedger(wrap);
   }
   state.usingAgGrid = false;
   status.textContent = 'AG Grid was not available, so the built in table is rendering the ledger. Sorting, filtering and grouping still work.';
-  state.fallback = renderLedgerTable(wrap, LEDGER_COLUMNS, rowsSorted);
+  mountTable(wrap);
 }
 
 function refreshLedger() {

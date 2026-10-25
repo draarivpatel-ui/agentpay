@@ -24,8 +24,8 @@ checks its work? The console answers it with four connected surfaces.
    inputs, same outputs, on every machine, with no clock reads inside the engine.
 4. **Approval Queue, Ledger, And Audit Trail.** Proposals wait for a human decision. Approving
    runs the simulated checkout stub and writes a ledger row. The ledger is the centerpiece: an
-   AG Grid Community table with sorting, filtering, and a row group panel, with a built in vanilla
-   JS fallback table when the CDN cannot load. The audit trail is append only, hash chained, and
+   AG Grid Community table with sorting and filtering, plus a built in vanilla JS table that groups
+   rows with counts and subtotals (one click away, and automatic when the CDN cannot load). The audit trail is append only, hash chained, and
    reverified on every render, with expandable before and after states.
 
 ## Features That Work Today
@@ -39,8 +39,10 @@ checks its work? The console answers it with four connected surfaces.
   velocity penalty, hit penalty).
 - An approval queue with approve and reject actions and a clearly labeled simulated checkout step.
 - An AG Grid Community v32 ledger (loaded from the jsDelivr CDN) with sortable columns, text and
-  number filters, a row group panel, pagination, and keyboard navigation.
-- A built in fallback table, used automatically when the AG Grid CDN is unreachable, that keeps
+  number filters, pagination, and keyboard navigation. Row grouping is an AG Grid Enterprise
+  feature, so grouping lives in the built in table instead.
+- A built in table, one click away through the Grouped Table toggle and used automatically when
+  the AG Grid CDN is unreachable, that keeps
   sorting, text and status filters, and grouped sections with row counts and amount subtotals.
 - An append only audit trail with FNV 1a hash chaining, chain verification, and before and after
   state diffs per entry.

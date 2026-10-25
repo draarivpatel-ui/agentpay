@@ -189,12 +189,16 @@
       <header class="block-head" data-reveal>
         <h2 id="ledger-title">The Transaction Ledger</h2>
         <p>
-          Every seed and session transaction in one table. Sort columns, filter by text and number,
-          and drag headers into the group panel to group rows. AG Grid Community loads from a CDN,
-          and when it cannot, a built in table takes over with the same core abilities.
+          Every seed and session transaction in one table. Sort columns and filter by text and number
+          in AG Grid Community, loaded from a CDN. Switch to the built in table to group rows by
+          merchant, category, agent, status and more, with counts and subtotals. If the CDN fails, that table
+          takes over on its own.
         </p>
       </header>
-      <p class="grid-status" id="grid-status" aria-live="polite" data-reveal>Loading the ledger table.</p>
+      <div class="ledger-bar" data-reveal>
+        <p class="grid-status" id="grid-status" aria-live="polite">Loading the ledger table.</p>
+        <button type="button" class="btn small ghost" id="ledger-view" aria-pressed="false" aria-controls="grid-wrap" hidden>Grouped Table</button>
+      </div>
       <div class="grid-wrap ag-theme-quartz-dark bracket" id="grid-wrap" data-reveal></div>
     </section>
 
