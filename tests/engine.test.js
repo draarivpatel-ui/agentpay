@@ -130,6 +130,13 @@ test('a proposal below the minimum trust tier hits the tier rule', () => {
   assert.equal(r.hits[0].rule, 'tier');
 });
 
+test('a proposal with no tier is treated as guest by the tier rule', () => {
+  const policies = [{ name: 'Verified Gate', maxAmount: 1000, action: 'block', trustTierMin: 'verified' }];
+  const r = evaluatePolicies(policies, proposal({ tier: undefined }), []);
+  assert.equal(r.decision, 'blocked');
+  assert.equal(r.hits[0].rule, 'tier');
+});
+
 test('a proposal at the required trust tier passes the tier rule', () => {
   const r = evaluatePolicies([{ name: 'Gate', maxAmount: 1000, action: 'review', trustTierMin: 'verified' }], proposal({ tier: 'verified' }), []);
   assert.equal(r.decision, 'approved');
