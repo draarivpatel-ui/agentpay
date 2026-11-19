@@ -105,7 +105,7 @@ the ledger automatically. Everything else works offline.
 Run the tests with Node 18 or newer (no install step, no network):
 
 ```
-node --test tests/
+npm test
 ```
 
 ## Project Structure
