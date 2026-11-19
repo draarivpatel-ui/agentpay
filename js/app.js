@@ -10,7 +10,7 @@ document.documentElement.classList.add('js');
 import { normalizePolicy, evaluatePolicies, riskScore, merchantMatches, categoryMatches } from './engine.js';
 import { append, verifyChain } from './ledger.js';
 import { runAgent, CATALOG } from './agent.js';
-import { createCheckout, isWired } from './checkout.js';
+import { createCheckout } from './checkout.js';
 import { defaultPolicies, seedTransactions, seedAudit } from './data.js';
 import { esc, fmtMoney, fmtTs, statusTone, chipHtml, scoreBarHtml, hitsLabel, actionLabel } from './format.js';
 import { renderLedgerTable } from './table-fallback.js';
@@ -395,11 +395,11 @@ function bindPolicyEvents() {
     const form = ev.target.closest('#add-policy');
     if (!form) return;
     ev.preventDefault();
-    submitAddPolicy(form);
+    submitAddPolicy();
   });
 }
 
-function submitAddPolicy(form) {
+function submitAddPolicy() {
   const errorEl = $('policy-error');
   errorEl.textContent = '';
   const spendRaw = $('pf-maxspend').value.trim();
