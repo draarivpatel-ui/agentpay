@@ -177,6 +177,7 @@ function formatUsd(value) {
 // without a policy should never be silent.
 export function evaluatePolicies(policies, proposal, history = []) {
   const checked = normalizeProposal(proposal);
+  const tier = checked.tier === undefined ? 'guest' : checked.tier;
   const list = Array.isArray(policies) ? policies : [];
   const matching = [];
   const hits = [];
@@ -204,8 +205,8 @@ export function evaluatePolicies(policies, proposal, history = []) {
     if (hour < policy.allowedHours[0] || hour >= policy.allowedHours[1]) {
       hits.push(hitFor(policy, 'hours', 'Hour ' + hour + ' UTC Is Outside The Allowed Window ' + policy.allowedHours[0] + ' To ' + policy.allowedHours[1]));
     }
-    if (TIER_RANK[checked.tier] < TIER_RANK[policy.trustTierMin]) {
-      hits.push(hitFor(policy, 'tier', 'Trust Tier ' + checked.tier + ' Is Below The Required ' + policy.trustTierMin));
+    if (TIER_RANK[tier] < TIER_RANK[policy.trustTierMin]) {
+      hits.push(hitFor(policy, 'tier', 'Trust Tier ' + tier + ' Is Below The Required ' + policy.trustTierMin));
     }
   }
 
